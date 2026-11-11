@@ -27,7 +27,6 @@ jobs:
           fi
           mkdir unpacked
           unzip -q "$ZIP" -d unpacked
-          ls -la unpacked
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -35,19 +34,25 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         run: |
           SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           SDKMANAGER=$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
-
-          if [ -z "$SDKMANAGER" ]; then
-            echo "sdkmanager not found"
-            exit 1
-          fi
-
-          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
           yes | "$SDKMANAGER" --licenses || true
           "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Create Android debug keystore
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
