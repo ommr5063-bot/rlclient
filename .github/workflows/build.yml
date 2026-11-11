@@ -1,0 +1,47 @@
+
+name: Build RLclient APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find and extract source ZIP
+        run: |
+          ZIP=$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)
+          test -n "$ZIP"
+          mkdir unpacked
+          unzip -q "$ZIP" -d unpacked
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APK
+        working-directory: unpacked/RLclient-source
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RLclient-debug-apk
+          path: unpacked/RLclient-source/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
