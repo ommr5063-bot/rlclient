@@ -1,4 +1,3 @@
-
 name: Build RLclient APK
 
 on:
@@ -24,6 +23,8 @@ jobs:
 
           if [ ! -f "$ZIP" ]; then
             echo "ERROR: Source ZIP not found"
+            echo "Files in repository:"
+            ls -la
             exit 1
           fi
 
@@ -32,6 +33,8 @@ jobs:
 
           if [ ! -f unpacked/RLclient-source/gradlew ]; then
             echo "ERROR: Invalid source ZIP structure"
+            echo "Extracted files:"
+            find unpacked -maxdepth 3 -type f | head -100
             exit 1
           fi
 
@@ -78,12 +81,30 @@ jobs:
         working-directory: unpacked/RLclient-source
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon
+
+          set -o pipefail
+
+          ./gradlew :app:assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --info \
+            --console=plain \
+            2>&1 | tee build.log
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: RLclient-0.1.7-Debug-APK
           path: unpacked/RLclient-source/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RLclient-Build-Log
+          path: unpacked/RLclient-source/build.log
+          if-no-files-found: warn
           retention-days: 14
