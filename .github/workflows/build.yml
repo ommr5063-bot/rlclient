@@ -18,32 +18,49 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract source ZIP
+      - name: Extract RLclient source
         run: |
-          ZIP=$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)
-          if [ -z "$ZIP" ]; then
-            echo "Source ZIP not found"
+          ZIP="RLclient-0.1.7-Criticals-DupeHub-working.zip"
+
+          if [ ! -f "$ZIP" ]; then
+            echo "ERROR: Source ZIP not found"
             exit 1
           fi
-          mkdir unpacked
+
+          mkdir -p unpacked
           unzip -q "$ZIP" -d unpacked
 
-      - name: Set up Java
+          if [ ! -f unpacked/RLclient-source/gradlew ]; then
+            echo "ERROR: Invalid source ZIP structure"
+            exit 1
+          fi
+
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         run: |
           SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           SDKMANAGER=$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
-          yes | "$SDKMANAGER" --licenses || true
-          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Create Android debug keystore
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses || true
+
+          "$SDKMANAGER" --install \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
+
+      - name: Create debug keystore
         run: |
           mkdir -p "$HOME/.android"
+
           keytool -genkeypair -v \
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android \
@@ -57,7 +74,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build APK
+      - name: Build RLclient Debug APK
         working-directory: unpacked/RLclient-source
         run: |
           chmod +x gradlew
@@ -66,6 +83,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: RLclient-debug-apk
+          name: RLclient-0.1.7-Debug-APK
           path: unpacked/RLclient-source/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          retention-days: 14
